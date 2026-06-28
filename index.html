@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PRF - Sistema Integrado de Gestão de Estudos (Operacional com Auto-Save)</title>
+    <style>
+        :root {
+            --prf-azul: #0B1C33; 
+            --prf-azul-light: #163155;
+            --prf-ouro: #FFCC00; 
+            --prf-ouro-dark: #D4A373;
+            --bg: #F1F5F9;
+            --surface: #FFFFFF;
+            --text-main: #0F172A;
+            --text-muted: #64748B;
+            --border: #CBD5E1;
+            --success: #10B981;
+            --danger: #EF4444;
+            --estudo: #3B82F6;
+            --revisao: #8B5CF6;
+            --backup-cor: #0284C7;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background-color: var(--bg); color: var(--text-main); padding: 15px; line-height: 1.5; }
+        
+        header {
+            background: linear-gradient(135deg, var(--prf-azul) 0%, var(--prf-azul-light) 100%);
+            color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px;
+            display: flex; flex-direction: column; gap: 10px; border-bottom: 5px solid var(--prf-ouro);
+            box-shadow: 0 4px 15px rgba(11, 28, 51, 0.2);
+        }
+        @media (min-width: 768px) {
+            header { flex-direction: row; justify-content: space-between; align-items: center; }
+        }
+        header h1 { font-size: 22px; font-weight: 900; letter-spacing: -0.5px; color: #FFFFFF; }
+        header h1 span { color: var(--prf-ouro); }
+        header p { color: #94A3B8; font-size: 12px; margin-top: 4px; }
+        .badge-institucional { background: var(--prf-ouro); color: var(--prf-azul); padding: 4px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; align-self: flex-start; }
+
+        .layout { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 1150px) { .layout { grid-template-columns: 360px 1fr; } }
+
+        .card { background-color: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 15px; position: relative; }
+        .card-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--prf-azul); display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--bg); padding-bottom: 6px; }
+
+        .form-group { margin-bottom: 10px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--prf-azul); }
+        input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background-color: #F8FAFC; color: var(--text-main); }
+        input:focus, select:focus { outline: none; border-color: var(--prf-azul); background-color: white; box-shadow: 0 0 0 3px rgba(11, 28, 51, 0.1); }
+
+        .btn { background-color: var(--prf-azul); color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; width: 100%; transition: 0.2s; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .btn:hover { background-color: var(--prf-azul-light); border-bottom: 2px solid var(--prf-ouro); }
+        .btn-success { background-color: var(--success); }
+        .btn-success:hover { background-color: #059669; }
+        .btn-danger { background-color: var(--danger); }
+        .btn-danger:hover { background-color: #DC2626; }
+        .btn-backup { background-color: var(--backup-cor); }
+        .btn-backup:hover { background-color: #0369a1; }
+
+        .timer-display { font-size: 34px; font-weight: 900; text-align: center; margin: 8px 0; font-family: monospace; color: var(--prf-azul); background: #F8FAFC; padding: 8px; border-radius: 8px; border: 1px solid var(--border); }
+        .timer-actions { display: flex; gap: 8px; }
+
+        .save-indicator { position: fixed; bottom: 20px; right: 20px; background: rgba(16, 185, 129, 0.95); color: white; padding: 10px 20px; border-radius: 30px; font-weight: 700; font-size: 12px; display: none; z-index: 9999; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+
+        .tabs { display: flex; gap: 6px; margin-bottom: 14px; border-bottom: 2px solid var(--border); padding-bottom: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .tab-btn { background: none; border: none; padding: 8px 12px; font-weight: 700; color: var(--text-muted); cursor: pointer; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+        .tab-btn.active { background-color: var(--prf-azul); color: var(--prf-ouro); }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; }
+
+        .ciclo-list { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; margin-bottom: 12px; }
+        .ciclo-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #F8FAFC; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+        .input-inline-hours { width: 60px; padding: 4px; text-align: center; }
+
+        .cal-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; background: var(--prf-azul); padding: 8px; border-radius: 8px; color: white; }
+        .cal-controls button { background: var(--prf-ouro); color: var(--prf-azul); border: none; padding: 6px 10px; font-weight: 700; border-radius: 4px; cursor: pointer; font-size: 11px; }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; overflow-x: auto; }
+        .calendar-day-head { text-align: center; font-weight: 700; font-size: 11px; color: var(--prf-azul); padding: 4px; background: #E2E8F0; border-radius: 4px; }
+        .calendar-day { min-height: 85px; background: white; border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; transition: 0.15s; }
+        .calendar-day:hover { border-color: var(--prf-azul); background-color: #F8FAFC; }
+        .calendar-day.empty { background: #E2E8F0; opacity: 0.4; cursor: default; pointer-events: none; }
+        .calendar-day.today { border: 2px solid var(--prf-ouro); background: #FFFDF5; }
+        .day-number { font-weight: 700; font-size: 11px; color: var(--text-muted); }
+        .day-tasks-container { display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+        .day-badge-task { font-size: 8px; padding: 1px 3px; border-radius: 3px; color: white; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+
+        .editor-container { background: #F8FAFC; border: 2px dashed var(--prf-azul); padding: 12px; border-radius: 8px; margin-bottom: 14px; display: none; }
+        .editor-task-list { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .editor-task-item { display: flex; justify-content: space-between; align-items: center; background: white; padding: 6px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 4px; font-size: 11px; }
+        
+        .tabla-atividades-container { width: 100%; overflow-x: auto; margin-top: 10px; }
+        .tabla-atividades { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; white-space: nowrap; }
+        .tabla-atividades th, .tabla-atividades td { padding: 6px 10px; border: 1px solid var(--border); }
+        .tabla-atividades th { background-color: var(--prf-azul); color: white; }
+        .action-table-btn { border: none; padding: 4px 6px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; margin-right: 2px; }
+        .btn-edit-tbl { background: var(--prf-ouro); color: var(--prf-azul); }
+        .btn-del-tbl { background: var(--danger); color: white; }
+
+        .desempenho-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .desempenho-card { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: white; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--prf-azul); }
+        .status-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px; text-transform: uppercase; }
+        .st-excelente { background: #D1FAE5; color: #065F46; }
+        .st-bom { background: #E0F2FE; color: #0369A1; }
+        .st-regular { background: #FEF3C7; color: #92400E; }
+        .st-alerta { background: #FEE2E2; color: #991B1B; }
+
+        .bloco-header { font-size: 13px; font-weight: 800; padding: 6px 10px; background: var(--prf-azul); color: var(--prf-ouro); border-radius: 6px; margin: 12px 0 6px 0; text-transform: uppercase; }
+        .materia-container { border: 1px solid var(--border); border-radius: 6px; background: white; margin-bottom: 6px; overflow: hidden; }
+        .materia-trigger { padding: 8px 12px; background: #F1F5F9; font-weight: 700; font-size: 12px; cursor: pointer; display: flex; justify-content: space-between; color: var(--prf-azul); }
+        .topicos-list { padding: 0 10px; }
+        .topico-row { display: grid; grid-template-columns: 1fr 45px 45px 45px; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); align-items: center; font-size: 11px; }
+        .center-check { text-align: center; }
+        .center-check input { width: 14px; height: 14px; accent-color: var(--prf-azul); cursor: pointer; }
+
+        .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+        .metric-box { background: #F8FAFC; border: 1px solid var(--border); padding: 6px; border-radius: 6px; text-align: center; }
+        .metric-box span { font-size: 9px; font-weight: 600; color: var(--text-muted); display: block; }
+        .metric-box strong { font-size: 13px; color: var(--prf-azul); }
+    </style>
+</head>
+<body>
+
+<div class="save-indicator" id="avisoSalvo">✓ Progresso Salvo Automaticamente!</div>
+
+<header>
+    <div>
+        <h1>PATRULHEIRO <span>GÊNESIS</span> — Painel PRF</h1>
+        <p>Acesse e gerencie seu progresso de qualquer computador ou celular</p>
+    </div>
+    <div class="badge-institucional">Ordem e Progresso</div>
+</header>
+
+<div class="layout">
+    <aside>
+        <div class="card">
+            <div class="card-title">⏱️ Horas Líquidas</div>
+            <div class="timer-display" id="displayTempo">00:00:00</div>
+            <div class="timer-actions">
+                <button class="btn btn-success" id="btnPlayPause" onclick="alternarCronometro()">Iniciar</button>
+                <button class="btn" style="background:#64748B" onclick="zerarCronometro()">Zerar</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">⚙️ Parâmetros do Ciclo</div>
+            <div class="form-group">
+                <label for="metaHoras">Meta de Horas Semanais</label>
+                <input type="number" id="metaHoras" value="28" oninput="calcularMetas(); forcarSalvamento();">
+            </div>
+            <div class="ciclo-list" id="domCicloList"></div>
+            <div class="metric-grid">
+                <div class="metric-box"><span>Carga Rodada</span><strong id="mTotalRodada">0h</strong></div>
+                <div class="metric-box"><span>Giro Estimado</span><strong id="mDiasGiro">0 d</strong></div>
+                <div class="metric-box" style="grid-column: span 2; background: #FFFDF5; border-color: var(--prf-ouro);">
+                    <span>Giros Planejados (2 Anos)</span><strong id="mGirosAno" style="color: var(--prf-azul);">0 Rodadas</strong>
+                </div>
+            </div>
+            <button class="btn btn-danger" style="margin-top:15px; font-size:10px; padding:6px;" onclick="limparBancoDadosTotal()">⚠ Limpar Banco de Dados</button>
+        </div>
+    </aside>
+
+    <main>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="trocarAba(event, 'aba-calendario')">🗓️ Calendário (2 Anos)</button>
+            <button class="tab-btn" onclick="trocarAba(event, 'aba-gerenciar-ciclo')">🛠️ Disciplinas</button>
+            <button class="tab-btn" onclick="trocarAba(event, 'aba-desempenho')">📈 Rendimento</button>
+            <button class="tab-btn" onclick="trocarAba(event, 'aba-edital')">📋 Edital</button>
+            <button class="tab-btn" style="color: var(--backup-cor); font-weight:800;" onclick="trocarAba(event, 'aba-backup')">🛡️ Backup Sincronizado</button>
+        </div>
+
+        <div id="aba-calendario" class="tab-panel active">
+            <div class="editor-container" id="containerEditorDia">
+                <h4 style="font-size:13px; margin-bottom:10px; color:var(--prf-azul);" id="txtDiaSelecionado">Planejar Atividade</h4>
+                <input type="hidden" id="editorIdEdicao" value="">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                    <div class="form-group">
+                        <label>Disciplina</label>
+                        <select id="editorMateria"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Modalidade</label>
+                        <select id="editorModo">
+                            <option value="Estudo">Estudo (Teoria)</option>
+                            <option value="Revisão">Revisão (Questões/Anki)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
+                    <div class="form-group">
+                        <label>Q. Feitas</label>
+                        <input type="number" id="editorFeitas" value="20" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Q. Acertadas</label>
+                        <input type="number" id="editorAcertadas" value="16" min="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Assunto / Tópico Estudado</label>
+                    <input type="text" id="editorAssunto" placeholder="Ex: CTB Artigo 1º ao 5º">
+                </div>
+                
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-success" style="flex:2;" id="btnSalvarAtividade" onclick="salvarAtividadeDia()">Gravar Atividade</button>
+                    <button class="btn" style="flex:1; background:#64748B" onclick="fecharEditor()">Fechar</button>
+                </div>
+                <div class="editor-task-list" id="listaTarefasEdicaoDia"></div>
+            </div>
+
+            <div class="card">
+                <div class="cal-controls">
+                    <button onclick="mudarMes(-1)">◀ Ant.</button>
+                    <h3 id="txtMesAnoAtual" style="font-size:14px; text-transform:uppercase;">Janeiro 2026</h3>
+                    <button onclick="mudarMes(1)">Próx. ▶</button>
+                </div>
+                <div class="calendar-grid" id="domCalendarioMatriz"></div>
+            </div>
+
+            <div class="card" id="cardPainelAtividadesFiltrado" style="display: none;">
+                <div class="card-title" id="tituloPainelFiltrado">📋 Registro de Atividades — Dia: </div>
+                <div class="tabla-atividades-container">
+                    <table class="tabla-atividades">
+                        <thead>
+                            <tr>
+                                <th>Matéria</th>
+                                <th>Modo</th>
+                                <th>Assunto Estudado</th>
+                                <th>Feitas</th>
+                                <th>Acertos</th>
+                                <th>%</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabelaAtividadesFiltradas"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="aba-gerenciar-ciclo" class="tab-panel">
+            <div class="card">
+                <div class="card-title">Inserir Nova Matéria no Ciclo</div>
+                <div style="display:grid; grid-template-columns: 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>Nome da Disciplina</label>
+                        <input type="text" id="addNomeMateria" placeholder="Ex: Legislação do SUS">
+                    </div>
+                    <div class="form-group">
+                        <label>Bloco Associado</label>
+                        <select id="addBlocoMateria">
+                            <option value="Bloco I">Bloco I</option>
+                            <option value="Bloco II">Bloco II</option>
+                            <option value="Bloco III">Bloco III</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="adicionarNovaMateriaAoCiclo()">Adicionar Matéria</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="aba-desempenho" class="tab-panel">
+            <div class="card">
+                <div class="card-title">Mapear Índice de Aproveitamento</div>
+                <div style="display:grid; grid-template-columns: 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>Disciplina</label>
+                        <select id="desempenhoMateria"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Taxa de Acertos / Status</label>
+                        <select id="desempenhoStatus">
+                            <option value="excelente">Excelente (85%+ acertos)</option>
+                            <option value="bom">Bom (75% a 85%)</option>
+                            <option value="regular">Regular (60% a 75%)</option>
+                            <option value="alerta">Alerta (Abaixo de 60%)</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="salvarDesempenho()">Atualizar Quadro</button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Diagnóstico de Engenharia Reversa</div>
+                <div class="desempenho-grid" id="quadroDesempenho"></div>
+            </div>
+        </div>
+
+        <div id="aba-edital" class="tab-panel">
+            <div class="card">
+                <div class="card-title">Distribuição de Conteúdo Programático</div>
+                <div id="domEditalVertical"></div>
+            </div>
+        </div>
+
+        <div id="aba-backup" class="tab-panel">
+            <div class="card" style="border-left: 5px solid var(--backup-cor);">
+                <div class="card-title" style="color:var(--backup-cor);">🛡️ Mudar de Aparelho / Sincronizar Progresso</div>
+                <p style="font-size:12px; margin-bottom:12px;">Como o site salva tudo localmente no navegador, para usar no computador e no celular sem perder dados, use os botões abaixo:</p>
+                
+                <div style="background:#F0F9FF; border:1px solid #BAE6FD; padding:10px; border-radius:8px; margin-bottom:15px; font-size:11px; color:#0C4A6E;">
+                    <b>Para levar o progresso para outro aparelho:</b><br>
+                    1. Neste aparelho atual, clique em <b>"Exportar Código de Backup"</b>.<br>
+                    2. Envie o texto gerado para o seu WhatsApp ou e-mail.<br>
+                    3. No novo aparelho, abra o link do site, cole o texto na caixa abaixo e clique em <b>"Restaurar Meu Progresso"</b>.
+                </div>
+
+                <div class="form-group">
+                    <label style="font-weight:bold; color:var(--backup-cor);">Código de Segurança Gerado / Espaço para Importação</label>
+                    <textarea id="txtAreaBackup" rows="6" placeholder="Cole aqui o seu código de backup para restaurar ou clique em exportar para gerar um novo código." style="font-family:monospace; font-size:11px; line-height:1.3; text-transform:none;"></textarea>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;">
+                    <button class="btn btn-backup" onclick="exportarBackupDados()">💾 Exportar Código de Backup</button>
+                    <button class="btn btn-success" onclick="importarBackupDados()">📂 Restaurar Meu Progresso</button>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    let baseCicloDefault = [
+        { id: 1, nome: "Língua Portuguesa", bloco: "Bloco I", horas: 2 },
+        { id: 2, nome: "Raciocínio Lógico-Matemático", bloco: "Bloco I", horas: 2 },
+        { id: 3, nome: "Informática", bloco: "Bloco I", horas: 2 },
+        { id: 4, nome: "Física", bloco: "Bloco I", horas: 1 },
+        { id: 5, nome: "Ética e Cidadania", bloco: "Bloco I", horas: 0.5 },
+        { id: 6, nome: "Geopolítica", bloco: "Bloco I", horas: 0.5 },
+        { id: 7, nome: "Língua Estrangeira", bloco: "Bloco I", horas: 1 },
+        { id: 8, nome: "Legislação de Trânsito", bloco: "Bloco II", horas: 3.5 },
+        { id: 9, nome: "Direito Administrativo", bloco: "Bloco III", horas: 2 },
+        { id: 10, nome: "Direito Constitucional", bloco: "Bloco III", horas: 2 },
+        { id: 11, nome: "Direito Penal", bloco: "Bloco III", horas: 2 },
+        { id: 12, nome: "Direito Processual Penal", bloco: "Bloco III", horas: 1.5 },
+        { id: 13, nome: "Legislação Especial", bloco: "Bloco III", horas: 2 },
+        { id: 14, nome: "Direitos Humanos", bloco: "Bloco III", horas: 1 }
+    ];
+
+    let baseCiclo = [];
+    let bancoCalendarioAtividades = {};
+    let rendimentoMaterias = {};
+    let editalMarcados = {}; 
+    let tempoSegundos = 0;
+    let dataCalendarioAtual = new Date(); 
+    const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    let diaSelecionadoChave = "";
+
+    const dadosEditalCompleto = {
+        "Bloco I": {
+            "Língua Portuguesa": ["1 Compreensão e interpretação.", "2 Gêneros textuais.", "3 Ortografia oficial.", "4 Coesão textual.", "5 Estrutura morfossintática.", "5.5 Concordância.", "5.7 Crase.", "5.8 Pronominal.", "6 Reescrita."],
+            "Raciocínio Lógico-Matemático": ["1 Equações de 1º e 2º graus.", "2 Funções e Gráficos.", "3 Razão/Regra de 3.", "4 Porcentagem.", "5 Sequências, PA/PG.", "6 Probabilidade.", "7 Estatística."],
+            "Informática": ["1 Internet/Intranet.", "2 Windows.", "3 IoT, Big Data e IA.", "4 Segurança, Vírus.", "5 Cloud Computing."],
+            "Física": ["1 Cinemática.", "2 Movimento Circular.", "3 Leis de Newton.", "4 Trabalho e Potência.", "6 Energia e Atrito.", "8 Impulso/Qtd Mov."],
+            "Ética e Cidadania": ["1 Ética e Moral.", "3 Integridade Pública.", "4.2 Lei 8.112/90.", "4.4.1 Decreto 1.171/94.", "5 Lei de Acesso à Informação."]
+        },
+        "Bloco II": {
+            "Legislação de Trânsito": ["1 Código de Trânsito Brasileiro (Lei 9.503/97).", "2 Lei nº 5.970/1973.", "3 Resoluções CONTRAN e Manuais."]
+        },
+        "Bloco III": {
+            "Direito Administrativo": ["1 Adm Direta/Indireta.", "2 Atos Administrativos.", "3 Lei 8.112/90.", "4 Poderes Administrativos.", "5 Licitações.", "7 Responsabilidade do Estado."],
+            "Direito Constitucional": ["1 Poder Constituinte.", "2 Direitos Individuais.", "4 Segurança Pública (Art. 144).", "4.4 Atribuições da PRF."],
+            "Direito Penal": ["1 Aplicação da Lei Penal.", "3 Tipicidade.", "4 Ilicitude.", "5 Culpabilidade.", "6 Crimes contra a Adm Pública."],
+            "Direito Processual Penal": ["1 Ação Penal.", "2 TCO (Lei 9.099/95).", "3 Provas/Cadeia de Custódia.", "4 Prisão em Flagrante."]
+        }
+    };
+
+    function carregarDadosSalvos() {
+        baseCiclo = localStorage.getItem("prf_baseCiclo") ? JSON.parse(localStorage.getItem("prf_baseCiclo")) : [...baseCicloDefault];
+        bancoCalendarioAtividades = localStorage.getItem("prf_bancoCalendario") ? JSON.parse(localStorage.getItem("prf_bancoCalendario")) : {};
+        rendimentoMaterias = localStorage.getItem("prf_rendimentoMaterias") ? JSON.parse(localStorage.getItem("prf_rendimentoMaterias")) : {};
+        editalMarcados = localStorage.getItem("prf_editalMarcados") ? JSON.parse(localStorage.getItem("prf_editalMarcados")) : {};
+        tempoSegundos = localStorage.getItem("prf_tempoSegundos") ? parseInt(localStorage.getItem("prf_tempoSegundos")) : 0;
+        if (localStorage.getItem("prf_metaHoras")) document.getElementById("metaHoras").value = localStorage.getItem("prf_metaHoras");
+        exibirTempo();
+    }
+
+    function salvarDadosNoNavegador() {
+        localStorage.setItem("prf_baseCiclo", JSON.stringify(baseCiclo));
+        localStorage.setItem("prf_bancoCalendario", JSON.stringify(bancoCalendarioAtividades));
+        localStorage.setItem("prf_rendimentoMaterias", JSON.stringify(rendimentoMaterias));
+        localStorage.setItem("prf_metaHoras", document.getElementById("metaHoras").value);
+        localStorage.setItem("prf_editalMarcados", JSON.stringify(editalMarcados));
+        localStorage.setItem("prf_tempoSegundos", tempoSegundos);
+
+        const indicador = document.getElementById("avisoSalvo");
+        indicador.style.display = "block";
+        setTimeout(() => { indicador.style.display = "none"; }, 1500);
+    }
+
+    function forcarSalvamento() { salvarDadosNoNavegador(); }
+
+    function limparBancoDadosTotal() {
+        if (confirm("ATENÇÃO: Deseja redefinir todo o sistema? Suas matérias e logs salvos serão deletados.")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    function exportarBackupDados() {
+        const pacoteEstudos = {
+            versao: "G-1.0",
+            metaHoras: document.getElementById("metaHoras").value,
+            baseCiclo: baseCiclo,
+            bancoCalendarioAtividades: bancoCalendarioAtividades,
+            rendimentoMaterias: rendimentoMaterias,
+            editalMarcados: editalMarcados,
+            tempoSegundos: tempoSegundos
+        };
+        try {
+            const textoJson = JSON.stringify(pacoteEstudos);
+            const stringBase64 = btoa(unescape(encodeURIComponent(textoJson)));
+            const areaTexto = document.getElementById("txtAreaBackup");
+            areaTexto.value = stringBase64;
+            areaTexto.select();
+            navigator.clipboard.writeText(stringBase64);
+            alert("🚀 Código copiado automaticamente! Salve-o em um local seguro (WhatsApp ou Drive) para poder restaurar no outro aparelho.");
+        } catch (erro) { alert("Erro ao processar a exportação: " + erro); }
+    }
+
+    function importarBackupDados() {
+        const codigoInjetado = document.getElementById("txtAreaBackup").value.trim();
+        if (!codigoInjetado) return alert("Por favor, cole o código de backup no campo de texto.");
+        if (confirm("⚠ ATENÇÃO: Carregar esse backup vai substituir todo o progresso atual. Deseja continuar?")) {
+            try {
+                const stringTraduzida = decodeURIComponent(escape(atob(codigoInjetado)));
+                const pacoteImportado = JSON.parse(stringTraduzida);
+                localStorage.setItem("prf_baseCiclo", JSON.stringify(pacoteImportado.baseCiclo));
+                localStorage.setItem("prf_bancoCalendario", JSON.stringify(pacoteImportado.bancoCalendarioAtividades));
+                localStorage.setItem("prf_rendimentoMaterias", JSON.stringify(pacoteImportado.rendimentoMaterias));
+                localStorage.setItem("prf_metaHoras", pacoteImportado.metaHoras);
+                localStorage.setItem("prf_editalMarcados", JSON.stringify(pacoteImportado.editalMarcados));
+                localStorage.setItem("prf_tempoSegundos", pacoteImportado.tempoSegundos);
+                alert("🎯 Progresso restaurado com sucesso! A página será reiniciada.");
+                location.reload();
+            } catch (erro) { alert("❌ Código inválido ou corrompido!"); }
+        }
+    }
+
+    function trocarAba(evt, idAba) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(idAba).style.display = 'block';
+        if(evt) evt.currentTarget.classList.add('active');
+    }
+
+    function adicionarNovaMateriaAoCiclo() {
+        const nome = document.getElementById("addNomeMateria").value.trim();
+        const bloco = document.getElementById("addBlocoMateria").value;
+        if (!nome) return alert("Digite o nome da disciplina.");
+        if (baseCiclo.some(m => m.nome.toLowerCase() === nome.toLowerCase())) return alert("Essa disciplina já existe.");
+        baseCiclo.push({ id: baseCiclo.length + 1, nome: nome, bloco: bloco, horas: 1.0 });
+        document.getElementById("addNomeMateria").value = "";
+        salvarDadosNoNavegador();
+        renderCiclo(); 
+        trocarAba(null, 'aba-calendario');
+    }
+
+    function renderCiclo() {
+        const container = document.getElementById("domCicloList");
+        container.innerHTML = "";
+        baseCiclo.forEach((mat) => {
+            container.innerHTML += `
+                <div class="ciclo-item">
+                    <span style="font-weight:700; color:var(--prf-azul);">${mat.nome}</span>
+                    <input type="number" class="input-inline-hours" value="${mat.horas}" step="0.5" onchange="modificarHora(${mat.id}, this.value)">
+                </div>
+            `;
+        });
+        calcularMetas();
+        atualizarDropdowns();
+    }
+
+    function modificarHora(id, valor) {
+        let mat = baseCiclo.find(m => m.id === id);
+        if (mat) mat.horas = parseFloat(valor) || 0.5;
+        calcularMetas();
+        salvarDadosNoNavegador();
+    }
+
+    function calcularMetas() {
+        const metaSemanal = parseFloat(document.getElementById("metaHoras").value) || 28;
+        let totalRodada = baseCiclo.reduce((sum, item) => sum + item.horas, 0);
+        document.getElementById("mTotalRodada").innerText = totalRodada + "h";
+        let diasGiro = totalRodada / (metaSemanal / 7);
+        document.getElementById("mDiasGiro").innerText = diasGiro.toFixed(1) + "d";
+        document.getElementById("mGirosAno").innerText = Math.floor((metaSemanal * 104) / totalRodada) + " Ciclos";
+    }
+
+    function atualizarDropdowns() {
+        const selectEditor = document.getElementById("editorMateria");
+        const selectDesempenho = document.getElementById("desempenhoMateria");
+        selectEditor.innerHTML = ""; selectDesempenho.innerHTML = "";
+        baseCiclo.forEach(m => {
+            selectEditor.innerHTML += `<option value="${m.nome}">${m.nome}</option>`;
+            selectDesempenho.innerHTML += `<option value="${m.nome}">${m.nome}</option>`;
+            if (!rendimentoMaterias[m.nome]) rendimentoMaterias[m.nome] = "regular";
+        });
+        renderDesempenho();
+    }
+
+    function renderCalendario() {
+        const grid = document.getElementById("domCalendarioMatriz");
+        const txtMesAno = document.getElementById("txtMesAnoAtual");
+        let ano = dataCalendarioAtual.getFullYear();
+        let mes = dataCalendarioAtual.getMonth();
+        txtMesAno.innerText = `${mesesNomes[mes]} ${ano}`;
+        grid.innerHTML = "";
+        const diasSemana = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+        diasSemana.forEach(d => grid.innerHTML += `<div class="calendar-day-head">${d}</div>`);
+        let primeiroDiaMes = new Date(ano, mes, 1).getDay();
+        let totalDiasNoMes = new Date(ano, mes + 1, 0).getDate();
+        for (let i = 0; i < primeiroDiaMes; i++) grid.innerHTML += `<div class="calendar-day empty"></div>`;
+        let hoje = new Date();
+        for (let dia = 1; dia <= totalDiasNoMes; dia++) {
+            let chave = `${ano}-${(mes+1).toString().padStart(2, '0')}-${dia.toString().padStart(2, '0')}`;
+            let classes = "calendar-day";
+            if (hoje.getDate() === dia && hoje.getMonth() === mes && hoje.getFullYear() === ano) classes += " today";
+            let tarefasHtml = "";
+            if (bancoCalendarioAtividades[chave] && bancoCalendarioAtividades[chave].length > 0) {
+                bancoCalendarioAtividades[chave].forEach(task => {
+                    let corFundo = task.modo === "Estudo" ? "var(--estudo)" : "var(--revisao)";
+                    let pct = task.feitas > 0 ? Math.round((task.acertadas / task.feitas) * 100) : 0;
+                    tarefasHtml += `<div class="day-badge-task" style="background:${corFundo};">${task.mat.substring(0,5)}.. (${pct}%)</div>`;
+                });
+            }
+            grid.innerHTML += `
+                <div class="${classes}" onclick="abrirEditorDia('${chave}')">
+                    <span class="day-number">${dia}</span>
+                    <div class="day-tasks-container">${tarefasHtml}</div>
+                </div>
+            `;
+        }
+        if (diaSelecionadoChave) renderTabelaAtividadesDoDia(diaSelecionadoChave);
+    }
+
+    function mudarMes(direcao) { dataCalendarioAtual.setMonth(dataCalendarioAtual.getMonth() + direcao); renderCalendario(); }
+
+    function abrirEditorDia(chave) {
+        diaSelecionadoChave = chave;
+        const partes = chave.split("-");
+        document.getElementById("editorIdEdicao").value = "";
+        document.getElementById("btnSalvarAtividade").innerText = "Gravar Atividade";
+        document.getElementById("txtDiaSelecionado").innerText = `Organizar Atividade - Data: ${partes[2]}/${partes[1]}/${partes[0]}`;
+        document.getElementById("containerEditorDia").style.display = "block";
+        renderListaTarefasEdicao();
+        renderTabelaAtividadesDoDia(chave);
+    }
+
+    function fecharEditor() {
+        document.getElementById("containerEditorDia").style.display = "none";
+        document.getElementById("cardPainelAtividadesFiltrado").style.display = "none";
+        document.getElementById("editorIdEdicao").value = "";
+        diaSelecionadoChave = "";
+    }
+
+    function salvarAtividadeDia() {
+        const mat = document.getElementById("editorMateria").value;
+        const modo = document.getElementById("editorModo").value;
+        const feitas = parseInt(document.getElementById("editorFeitas").value) || 0;
+        const acertadas = parseInt(document.getElementById("editorAcertadas").value) || 0;
+        const ass = document.getElementById("editorAssunto").value.trim();
+        const idEdicao = document.getElementById("editorIdEdicao").value;
+        if (!ass) return alert("Preencha o assunto estudado.");
+        if (acertadas > feitas) return alert("Acertos não podem ser maiores que feitas!");
+        if (!bancoCalendarioAtividades[diaSelecionadoChave]) bancoCalendarioAtividades[diaSelecionadoChave] = [];
+        if (idEdicao !== "") {
+            bancoCalendarioAtividades[diaSelecionadoChave][idEdicao] = { mat, modo, feitas, acertadas, ass };
+        } else {
+            bancoCalendarioAtividades[diaSelecionadoChave].push({ mat, modo, feitas, acertadas, ass });
+        }
+        document.getElementById("editorAssunto").value = "";
+        document.getElementById("editorIdEdicao").value = "";
+        document.getElementById("btnSalvarAtividade").innerText = "Gravar Atividade";
+        salvarDadosNoNavegador();
+        renderListaTarefasEdicao();
+        renderTabelaAtividadesDoDia(diaSelecionadoChave);
+        renderCalendario();
+    }
+
+    function renderListaTarefasEdicao() {
+        const areaListagem = document.getElementById("listaTarefasEdicaoDia");
+        areaListagem.innerHTML = "";
+        const tarefas = bancoCalendarioAtividades[diaSelecionadoChave] || [];
+        if (tarefas.length === 0) {
+            areaListagem.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Nenhuma atividade neste dia.</p>`;
+            return;
+        }
+        tarefas.forEach((t, index) => {
+            let pct = t.feitas > 0 ? Math.round((t.acertadas / t.feitas) * 100) : 0;
+            areaListagem.innerHTML += `
+                <div class="editor-task-item">
+                    <div><strong>[${t.modo}] ${t.mat}</strong><br><small>${t.acertadas}/${t.feitas} acertos (${pct}%)</small></div>
+                    <div>
+                         <button class="action-table-btn btn-edit-tbl" onclick="carregarParaEdicao('${diaSelecionadoChave}', ${index})">✏️</button>
+                         <button class="action-table-btn btn-del-tbl" onclick="deletarTarefaDia('${diaSelecionadoChave}', ${index})">❌</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function renderTabelaAtividadesDoDia(chaveData) {
+        const painelCard = document.getElementById("cardPainelAtividadesFiltrado");
+        const tabelaCorpo = document.getElementById("corpoTabelaAtividadesFiltradas");
+        tabelaCorpo.innerHTML = "";
+        const tarefas = bancoCalendarioAtividades[chaveData] || [];
+        if (tarefas.length > 0) {
+            tarefas.forEach((t, idx) => {
+                let pct = t.feitas > 0 ? Math.round((t.acertadas / t.feitas) * 100) : 0;
+                let tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td><b>${t.mat}</b></td>
+                    <td><span style="color:${t.modo === 'Estudo' ? 'var(--estudo)' : 'var(--revisao)'}; font-weight:bold;">${t.modo}</span></td>
+                    <td>${t.ass}</td>
+                    <td>${t.feitas}</td>
+                    <td>${t.acertadas}</td>
+                    <td><b>${pct}%</b></td>
+                    <td>
+                        <button class="action-table-btn btn-edit-tbl" onclick="carregarParaEdicao('${chaveData}', ${idx})">✏️</button>
+                        <button class="action-table-btn btn-del-tbl" onclick="deletarTarefaDia('${chaveData}', ${idx})">❌</button>
+                    </td>
+                `;
+                tabelaCorpo.appendChild(tr);
+            });
+            painelCard.style.display = "block";
+        } else {
+            painelCard.style.display = "none";
+        }
+    }
+
+    function carregarParaEdicao(chaveData, index) {
+        const task = bancoCalendarioAtividades[chaveData][index];
+        document.getElementById("editorMateria").value = task.mat;
+        document.getElementById("editorModo").value = task.modo;
+        document.getElementById("editorFeitas").value = task.feitas;
+        document.getElementById("editorAcertadas").value = task.acertadas;
+        document.getElementById("editorAssunto").value = task.ass;
+        document.getElementById("editorIdEdicao").value = index;
+        document.getElementById("btnSalvarAtividade").innerText = "Atualizar Atividade 💾";
+        document.getElementById("containerEditorDia").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function deletarTarefaDia(chaveData, index) {
+        if (confirm("Deseja realmente excluir esta atividade?")) {
+            bancoCalendarioAtividades[chaveData].splice(index, 1);
+            if (bancoCalendarioAtividades[chaveData].length === 0) delete bancoCalendarioAtividades[chaveData];
+            salvarDadosNoNavegador(); renderCalendario(); renderListaTarefasEdicao(); renderTabelaAtividadesDoDia(chaveData);
+        }
+    }
+
+    let intervaloTimer = null;
+    function alternarCronometro() {
+        const btn = document.getElementById("btnPlayPause");
+        if (intervaloTimer) {
+            clearInterval(intervaloTimer); intervaloTimer = null;
+            btn.innerText = "Retomar"; btn.className = "btn btn-success";
+            salvarDadosNoNavegador();
+        } else {
+            intervaloTimer = setInterval(() => {
+                tempoSegundos++; exibirTempo();
+                if(tempoSegundos % 30 === 0) localStorage.setItem("prf_tempoSegundos", tempoSegundos);
+            }, 1000);
+            btn.innerText = "Pausar"; btn.className = "btn btn-danger";
+        }
+    }
+
+    function zerarCronometro() {
+        if (confirm("Zerar cronômetro?")) {
+            clearInterval(intervaloTimer); intervaloTimer = null; tempoSegundos = 0; exibirTempo();
+            salvarDadosNoNavegador(); document.getElementById("btnPlayPause").innerText = "Iniciar";
+            document.getElementById("btnPlayPause").className = "btn btn-success";
+        }
+    }
+
+    function exibirTempo() {
+        const hrs = Math.floor(tempoSegundos / 3600).toString().padStart(2, '0');
+        const mins = Math.floor((tempoSegundos % 3600) / 60).toString().padStart(2, '0');
+        const segs = (tempoSegundos % 60).toString().padStart(2, '0');
+        document.getElementById("displayTempo").innerText = `${hrs}:${mins}:${segs}`;
+    }
+
+    function salvarDesempenho() {
+        const mat = document.getElementById("desempenhoMateria").value;
+        const status = document.getElementById("desempenhoStatus").value;
+        rendimentoMaterias[mat] = status; salvarDadosNoNavegador(); renderDesempenho();
+    }
+
+    function renderDesempenho() {
+        const container = document.getElementById("quadroDesempenho"); container.innerHTML = "";
+        for (let mat in rendimentoMaterias) {
+            let status = rendimentoMaterias[mat];
+            let label = status === "excelente" ? "85%+" : status === "bom" ? "75%-85%" : status === "regular" ? "60%-75%" : "Alerta";
+            container.innerHTML += `
+                <div class="desempenho-card">
+                    <span style="font-weight:700; font-size:12px;">${mat}</span>
+                    <span class="status-badge st-${status}">${label}</span>
+                </div>
+            `;
+        }
+    }
+
+    function renderEdital() {
+        const target = document.getElementById("domEditalVertical"); target.innerHTML = "";
+        for (let bloco in dadosEditalCompleto) {
+            let bDiv = document.createElement("div");
+            bDiv.innerHTML = `<div class="bloco-header">${bloco}</div>`;
+            for (let materia in dadosEditalCompleto[bloco]) {
+                let mContainer = document.createElement("div");
+                mContainer.className = "materia-container";
+                mContainer.innerHTML = `
+                    <div class="materia-trigger" onclick="toggleMateriaList(this)"><span>${materia}</span> <span>[+]</span></div>
+                    <div class="topicos-list" style="display:none;">
+                        <div class="topico-row" style="font-weight:700; background:#F8FAFC;">
+                            <div>Tópico</div><div class="center-check">Teo</div><div class="center-check">Qst</div><div class="center-check">Anki</div>
+                        </div>
+                    </div>
+                `;
+                let listArea = mContainer.querySelector(".topicos-list");
+                dadosEditalCompleto[bloco][materia].forEach((topico, idx) => {
+                    let idTeoria = `${materia}-${idx}-teoria`; let idQuest = `${materia}-${idx}-quest`; let idAnki = `${materia}-${idx}-anki`;
+                    let checkTeoria = editalMarcados[idTeoria] ? 'checked' : '';
+                    let checkQuest = editalMarcados[idQuest] ? 'checked' : '';
+                    let checkAnki = editalMarcados[idAnki] ? 'checked' : '';
+                    listArea.innerHTML += `
+                        <div class="topico-row">
+                            <div>${topico}</div>
+                            <div class="center-check"><input type="checkbox" id="${idTeoria}" ${checkTeoria} onchange="salvarEstadoCheckboxEdital(this)"></div>
+                            <div class="center-check"><input type="checkbox" id="${idQuest}" ${checkQuest} onchange="salvarEstadoCheckboxEdital(this)"></div>
+                            <div class="center-check"><input type="checkbox" id="${idAnki}" ${checkAnki} onchange="salvarEstadoCheckboxEdital(this)"></div>
+                        </div>
+                    `;
+                });
+                bDiv.appendChild(mContainer);
+            }
+            target.appendChild(bDiv);
+        }
+    }
+
+    function salvarEstadoCheckboxEdital(el) { editalMarcados[el.id] = el.checked; salvarDadosNoNavegador(); }
+    
+    function toggleMateriaList(el) {
+        let list = el.nextElementSibling;
+        let ativo = list.style.display === "block";
+        list.style.display = ativo ? "none" : "block";
+        el.querySelector('span:last-child').innerText = ativo ? "[+]" : "[-]";
+    }
+
+    window.onload = function() {
+        carregarDadosSalvos(); renderCiclo(); renderCalendario(); renderEdital();
+        document.getElementById("aba-calendario").style.display = "block";
+        document.getElementById("aba-gerenciar-ciclo").style.display = "none";
+        document.getElementById("aba-desempenho").style.display = "none";
+        document.getElementById("aba-edital").style.display = "none";
+        document.getElementById("aba-backup").style.display = "none";
+    };
+</script>
+</body>
+</html>
