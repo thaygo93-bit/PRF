@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PRF - Sistema Integrado de Gestão de Estudos (Operacional com Auto-Save)</title>
+    <title>PRF - Sistema Integrado de Gestão de Estudos (Teia de Aranha Ativo)</title>
+    <!-- Biblioteca do Gráfico de Teia (Radar) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --prf-azul: #0B1C33; 
@@ -16,9 +18,8 @@
             --text-muted: #64748B;
             --border: #CBD5E1;
             --success: #10B981;
-            --danger: #EF4444;
-            --estudo: #3B82F6;
-            --revisao: #8B5CF6;
+            --danger: #EF4444; /* Vermelho para Revisões */
+            --estudo: #3B82F6;  /* Azul para Teoria */
             --backup-cor: #0284C7;
         }
 
@@ -98,13 +99,8 @@
         .btn-edit-tbl { background: var(--prf-ouro); color: var(--prf-azul); }
         .btn-del-tbl { background: var(--danger); color: white; }
 
-        .desempenho-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-        .desempenho-card { padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: white; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--prf-azul); }
-        .status-badge { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 20px; text-transform: uppercase; }
-        .st-excelente { background: #D1FAE5; color: #065F46; }
-        .st-bom { background: #E0F2FE; color: #0369A1; }
-        .st-regular { background: #FEF3C7; color: #92400E; }
-        .st-alerta { background: #FEE2E2; color: #991B1B; }
+        /* Gráfico Canvas Wrapper */
+        .chart-container { position: relative; margin: auto; height: 320px; width: 100%; max-width: 450px; }
 
         .bloco-header { font-size: 13px; font-weight: 800; padding: 6px 10px; background: var(--prf-azul); color: var(--prf-ouro); border-radius: 6px; margin: 12px 0 6px 0; text-transform: uppercase; }
         .materia-container { border: 1px solid var(--border); border-radius: 6px; background: white; margin-bottom: 6px; overflow: hidden; }
@@ -164,15 +160,16 @@
     <main>
         <div class="tabs">
             <button class="tab-btn active" onclick="trocarAba(event, 'aba-calendario')">🗓️ Calendário (2 Anos)</button>
+            <button class="tab-btn" onclick="trocarAba(event, 'aba-desempenho')">📈 Desempenho (Teia)</button>
             <button class="tab-btn" onclick="trocarAba(event, 'aba-gerenciar-ciclo')">🛠️ Disciplinas</button>
-            <button class="tab-btn" onclick="trocarAba(event, 'aba-desempenho')">📈 Rendimento</button>
             <button class="tab-btn" onclick="trocarAba(event, 'aba-edital')">📋 Edital</button>
             <button class="tab-btn" style="color: var(--backup-cor); font-weight:800;" onclick="trocarAba(event, 'aba-backup')">🛡️ Backup Sincronizado</button>
         </div>
 
+        <!-- ABA CALENDÁRIO INTERATIVO -->
         <div id="aba-calendario" class="tab-panel active">
             <div class="editor-container" id="containerEditorDia">
-                <h4 style="font-size:13px; margin-bottom:10px; color:var(--prf-azul);" id="txtDiaSelecionado">Planejar Atividade</h4>
+                <h4 style="font-size:13px; margin-bottom:10px; color:var(--prf-azul complacency);" id="txtDiaSelecionado">Planejar Atividade</h4>
                 <input type="hidden" id="editorIdEdicao" value="">
 
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:8px;">
@@ -183,8 +180,8 @@
                     <div class="form-group">
                         <label>Modalidade</label>
                         <select id="editorModo">
-                            <option value="Estudo">Estudo (Teoria)</option>
-                            <option value="Revisão">Revisão (Questões/Anki)</option>
+                            <option value="Estudo" style="color: var(--estudo); font-weight:bold;">Estudo (Teoria) - Azul</option>
+                            <option value="Revisão" style="color: var(--danger); font-weight:bold;">Revisão (Questões/Anki) - Vermelho</option>
                         </select>
                     </div>
                 </div>
@@ -236,12 +233,24 @@
                                 <th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="corpoTabelaAtividadesFiltradas"></tbody>
+                        <tbody id="corpoTabelaAtividadesFiladas"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
+        <!-- ABA DESEMPENHO (GRAFICO TEIA) -->
+        <div id="aba-desempenho" class="tab-panel">
+            <div class="card">
+                <div class="card-title">📊 Evolução e Aproveitamento por Matéria (Média Geral)</div>
+                <p style="font-size:11px; color:var(--text-muted); margin-bottom:15px;">O gráfico calcula em tempo real o seu aproveitamento médio baseado em todas as questões feitas e acertadas lançadas no calendário.</p>
+                <div class="chart-container">
+                    <canvas id="graficoTeiaRadar"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA DISCIPLINAS -->
         <div id="aba-gerenciar-ciclo" class="tab-panel">
             <div class="card">
                 <div class="card-title">Inserir Nova Matéria no Ciclo</div>
@@ -263,32 +272,7 @@
             </div>
         </div>
 
-        <div id="aba-desempenho" class="tab-panel">
-            <div class="card">
-                <div class="card-title">Mapear Índice de Aproveitamento</div>
-                <div style="display:grid; grid-template-columns: 1fr; gap:10px;">
-                    <div class="form-group">
-                        <label>Disciplina</label>
-                        <select id="desempenhoMateria"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>Taxa de Acertos / Status</label>
-                        <select id="desempenhoStatus">
-                            <option value="excelente">Excelente (85%+ acertos)</option>
-                            <option value="bom">Bom (75% a 85%)</option>
-                            <option value="regular">Regular (60% a 75%)</option>
-                            <option value="alerta">Alerta (Abaixo de 60%)</option>
-                        </select>
-                    </div>
-                    <button class="btn" onclick="salvarDesempenho()">Atualizar Quadro</button>
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-title">Diagnóstico de Engenharia Reversa</div>
-                <div class="desempenho-grid" id="quadroDesempenho"></div>
-            </div>
-        </div>
-
+        <!-- ABA EDITAL -->
         <div id="aba-edital" class="tab-panel">
             <div class="card">
                 <div class="card-title">Distribuição de Conteúdo Programático</div>
@@ -296,6 +280,7 @@
             </div>
         </div>
 
+        <!-- ABA BACKUP -->
         <div id="aba-backup" class="tab-panel">
             <div class="card" style="border-left: 5px solid var(--backup-cor);">
                 <div class="card-title" style="color:var(--backup-cor);">🛡️ Mudar de Aparelho / Sincronizar Progresso</div>
@@ -310,7 +295,7 @@
 
                 <div class="form-group">
                     <label style="font-weight:bold; color:var(--backup-cor);">Código de Segurança Gerado / Espaço para Importação</label>
-                    <textarea id="txtAreaBackup" rows="6" placeholder="Cole aqui o seu código de backup para restaurar ou clique em exportar para gerar um novo código." style="font-family:monospace; font-size:11px; line-height:1.3; text-transform:none;"></textarea>
+                    <textarea id="txtAreaBackup" rows="6" placeholder="Cole aqui o seu código de backup..." style="font-family:monospace; font-size:11px; line-height:1.3; text-transform:none;"></textarea>
                 </div>
 
                 <div style="display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px;">
@@ -323,6 +308,15 @@
 </div>
 
 <script>
+    // Configurações e Siglas Oficiais
+    const mapeamentoSiglas = {
+        "Língua Portuguesa": "LP", "Raciocínio Lógico-Matemático": "RLM", "Informática": "INF",
+        "Física": "FIS", "Ética e Cidadania": "EC", "Geopolítica": "GEO", "Língua Estrangeira": "LE",
+        "Legislação de Trânsito": "CTB", "Direito Administrativo": "DADM", "Direito Constitucional": "DCON",
+        "Direito Penal": "DPEN", "Direito Processual Penal": "DPP", "Legislação Especial": "LESP",
+        "Direitos Humanos": "DH"
+    };
+
     let baseCicloDefault = [
         { id: 1, nome: "Língua Portuguesa", bloco: "Bloco I", horas: 2 },
         { id: 2, nome: "Raciocínio Lógico-Matemático", bloco: "Bloco I", horas: 2 },
@@ -342,12 +336,12 @@
 
     let baseCiclo = [];
     let bancoCalendarioAtividades = {};
-    let rendimentoMaterias = {};
     let editalMarcados = {}; 
     let tempoSegundos = 0;
     let dataCalendarioAtual = new Date(); 
     const mesesNomes = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     let diaSelecionadoChave = "";
+    let chartInstancia = null;
 
     const dadosEditalCompleto = {
         "Bloco I": {
@@ -371,7 +365,6 @@
     function carregarDadosSalvos() {
         baseCiclo = localStorage.getItem("prf_baseCiclo") ? JSON.parse(localStorage.getItem("prf_baseCiclo")) : [...baseCicloDefault];
         bancoCalendarioAtividades = localStorage.getItem("prf_bancoCalendario") ? JSON.parse(localStorage.getItem("prf_bancoCalendario")) : {};
-        rendimentoMaterias = localStorage.getItem("prf_rendimentoMaterias") ? JSON.parse(localStorage.getItem("prf_rendimentoMaterias")) : {};
         editalMarcados = localStorage.getItem("prf_editalMarcados") ? JSON.parse(localStorage.getItem("prf_editalMarcados")) : {};
         tempoSegundos = localStorage.getItem("prf_tempoSegundos") ? parseInt(localStorage.getItem("prf_tempoSegundos")) : 0;
         if (localStorage.getItem("prf_metaHoras")) document.getElementById("metaHoras").value = localStorage.getItem("prf_metaHoras");
@@ -381,7 +374,6 @@
     function salvarDadosNoNavegador() {
         localStorage.setItem("prf_baseCiclo", JSON.stringify(baseCiclo));
         localStorage.setItem("prf_bancoCalendario", JSON.stringify(bancoCalendarioAtividades));
-        localStorage.setItem("prf_rendimentoMaterias", JSON.stringify(rendimentoMaterias));
         localStorage.setItem("prf_metaHoras", document.getElementById("metaHoras").value);
         localStorage.setItem("prf_editalMarcados", JSON.stringify(editalMarcados));
         localStorage.setItem("prf_tempoSegundos", tempoSegundos);
@@ -389,24 +381,23 @@
         const indicador = document.getElementById("avisoSalvo");
         indicador.style.display = "block";
         setTimeout(() => { indicador.style.display = "none"; }, 1500);
+        gerarOuAtualizarGraficoTeia();
     }
 
     function forcarSalvamento() { salvarDadosNoNavegador(); }
 
     function limparBancoDadosTotal() {
         if (confirm("ATENÇÃO: Deseja redefinir todo o sistema? Suas matérias e logs salvos serão deletados.")) {
-            localStorage.clear();
-            location.reload();
+            localStorage.clear(); location.reload();
         }
     }
 
     function exportarBackupDados() {
         const pacoteEstudos = {
-            versao: "G-1.0",
+            versao: "G-1.2",
             metaHoras: document.getElementById("metaHoras").value,
             baseCiclo: baseCiclo,
             bancoCalendarioAtividades: bancoCalendarioAtividades,
-            rendimentoMaterias: rendimentoMaterias,
             editalMarcados: editalMarcados,
             tempoSegundos: tempoSegundos
         };
@@ -414,29 +405,30 @@
             const textoJson = JSON.stringify(pacoteEstudos);
             const stringBase64 = btoa(unescape(encodeURIComponent(textoJson)));
             const areaTexto = document.getElementById("txtAreaBackup");
-            areaTexto.value = stringBase64;
-            areaTexto.select();
+            areaTexto.value = stringBase64; areaTexto.select();
             navigator.clipboard.writeText(stringBase64);
-            alert("🚀 Código copiado automaticamente! Salve-o em um local seguro (WhatsApp ou Drive) para poder restaurar no outro aparelho.");
-        } catch (erro) { alert("Erro ao processar a exportação: " + erro); }
+            alert("🚀 Código copiado automaticamente! Leve para seu outro aparelho.");
+        } catch (erro) { alert("Erro ao exportar: " + erro); }
+    }
+
+    function tirarSigla(nomeCompleto) {
+        return mapeamentoSiglas[nomeCompleto] || nomeCompleto.substring(0,4).toUpperCase();
     }
 
     function importarBackupDados() {
         const codigoInjetado = document.getElementById("txtAreaBackup").value.trim();
-        if (!codigoInjetado) return alert("Por favor, cole o código de backup no campo de texto.");
-        if (confirm("⚠ ATENÇÃO: Carregar esse backup vai substituir todo o progresso atual. Deseja continuar?")) {
+        if (!codigoInjetado) return alert("Por favor, cole o código de backup.");
+        if (confirm("⚠ ATENÇÃO: Carregar esse backup vai substituir todo o progresso atual.")) {
             try {
                 const stringTraduzida = decodeURIComponent(escape(atob(codigoInjetado)));
                 const pacoteImportado = JSON.parse(stringTraduzida);
                 localStorage.setItem("prf_baseCiclo", JSON.stringify(pacoteImportado.baseCiclo));
                 localStorage.setItem("prf_bancoCalendario", JSON.stringify(pacoteImportado.bancoCalendarioAtividades));
-                localStorage.setItem("prf_rendimentoMaterias", JSON.stringify(pacoteImportado.rendimentoMaterias));
                 localStorage.setItem("prf_metaHoras", pacoteImportado.metaHoras);
                 localStorage.setItem("prf_editalMarcados", JSON.stringify(pacoteImportado.editalMarcados));
                 localStorage.setItem("prf_tempoSegundos", pacoteImportado.tempoSegundos);
-                alert("🎯 Progresso restaurado com sucesso! A página será reiniciada.");
-                location.reload();
-            } catch (erro) { alert("❌ Código inválido ou corrompido!"); }
+                alert("🎯 Progresso restaurado com sucesso!"); location.reload();
+            } catch (erro) { alert("❌ Código inválido!"); }
         }
     }
 
@@ -445,6 +437,9 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(idAba).style.display = 'block';
         if(evt) evt.currentTarget.classList.add('active');
+        if(idAba === 'aba-desempenho') {
+            setTimeout(gerarOuAtualizarGraficoTeia, 50);
+        }
     }
 
     function adicionarNovaMateriaAoCiclo() {
@@ -454,31 +449,26 @@
         if (baseCiclo.some(m => m.nome.toLowerCase() === nome.toLowerCase())) return alert("Essa disciplina já existe.");
         baseCiclo.push({ id: baseCiclo.length + 1, nome: nome, bloco: bloco, horas: 1.0 });
         document.getElementById("addNomeMateria").value = "";
-        salvarDadosNoNavegador();
-        renderCiclo(); 
-        trocarAba(null, 'aba-calendario');
+        salvarDadosNoNavegador(); renderCiclo(); trocarAba(null, 'aba-calendario');
     }
 
     function renderCiclo() {
-        const container = document.getElementById("domCicloList");
-        container.innerHTML = "";
+        const container = document.getElementById("domCicloList"); container.innerHTML = "";
         baseCiclo.forEach((mat) => {
             container.innerHTML += `
                 <div class="ciclo-item">
-                    <span style="font-weight:700; color:var(--prf-azul);">${mat.nome}</span>
+                    <span style="font-weight:700; color:var(--prf-azul);">[${tirarSigla(mat.nome)}] ${mat.nome}</span>
                     <input type="number" class="input-inline-hours" value="${mat.horas}" step="0.5" onchange="modificarHora(${mat.id}, this.value)">
                 </div>
             `;
         });
-        calcularMetas();
-        atualizarDropdowns();
+        calcularMetas(); atualizarDropdowns();
     }
 
     function modificarHora(id, valor) {
         let mat = baseCiclo.find(m => m.id === id);
         if (mat) mat.horas = parseFloat(valor) || 0.5;
-        calcularMetas();
-        salvarDadosNoNavegador();
+        calcularMetas(); salvarDadosNoNavegador();
     }
 
     function calcularMetas() {
@@ -492,14 +482,10 @@
 
     function atualizarDropdowns() {
         const selectEditor = document.getElementById("editorMateria");
-        const selectDesempenho = document.getElementById("desempenhoMateria");
-        selectEditor.innerHTML = ""; selectDesempenho.innerHTML = "";
+        selectEditor.innerHTML = "";
         baseCiclo.forEach(m => {
             selectEditor.innerHTML += `<option value="${m.nome}">${m.nome}</option>`;
-            selectDesempenho.innerHTML += `<option value="${m.nome}">${m.nome}</option>`;
-            if (!rendimentoMaterias[m.nome]) rendimentoMaterias[m.nome] = "regular";
         });
-        renderDesempenho();
     }
 
     function renderCalendario() {
@@ -522,9 +508,9 @@
             let tarefasHtml = "";
             if (bancoCalendarioAtividades[chave] && bancoCalendarioAtividades[chave].length > 0) {
                 bancoCalendarioAtividades[chave].forEach(task => {
-                    let corFundo = task.modo === "Estudo" ? "var(--estudo)" : "var(--revisao)";
+                    let corFundo = task.modo === "Estudo" ? "var(--estudo)" : "var(--danger)";
                     let pct = task.feitas > 0 ? Math.round((task.acertadas / task.feitas) * 100) : 0;
-                    tarefasHtml += `<div class="day-badge-task" style="background:${corFundo};">${task.mat.substring(0,5)}.. (${pct}%)</div>`;
+                    tarefasHtml += `<div class="day-badge-task" style="background:${corFundo}; text-decoration:none;">${tirarSigla(task.mat)} (${pct}%)</div>`;
                 });
             }
             grid.innerHTML += `
@@ -540,20 +526,17 @@
     function mudarMes(direcao) { dataCalendarioAtual.setMonth(dataCalendarioAtual.getMonth() + direcao); renderCalendario(); }
 
     function abrirEditorDia(chave) {
-        diaSelecionadoChave = chave;
-        const partes = chave.split("-");
+        diaSelecionadoChave = chave; const partes = chave.split("-");
         document.getElementById("editorIdEdicao").value = "";
         document.getElementById("btnSalvarAtividade").innerText = "Gravar Atividade";
         document.getElementById("txtDiaSelecionado").innerText = `Organizar Atividade - Data: ${partes[2]}/${partes[1]}/${partes[0]}`;
         document.getElementById("containerEditorDia").style.display = "block";
-        renderListaTarefasEdicao();
-        renderTabelaAtividadesDoDia(chave);
+        renderListaTarefasEdicao(); renderTabelaAtividadesDoDia(chave);
     }
 
     function fecharEditor() {
         document.getElementById("containerEditorDia").style.display = "none";
         document.getElementById("cardPainelAtividadesFiltrado").style.display = "none";
-        document.getElementById("editorIdEdicao").value = "";
         diaSelecionadoChave = "";
     }
 
@@ -575,24 +558,20 @@
         document.getElementById("editorAssunto").value = "";
         document.getElementById("editorIdEdicao").value = "";
         document.getElementById("btnSalvarAtividade").innerText = "Gravar Atividade";
-        salvarDadosNoNavegador();
-        renderListaTarefasEdicao();
-        renderTabelaAtividadesDoDia(diaSelecionadoChave);
-        renderCalendario();
+        salvarDadosNoNavegador(); renderListaTarefasEdicao(); renderTabelaAtividadesDoDia(diaSelecionadoChave); renderCalendario();
     }
 
     function renderListaTarefasEdicao() {
-        const areaListagem = document.getElementById("listaTarefasEdicaoDia");
-        areaListagem.innerHTML = "";
+        const areaListagem = document.getElementById("listaTarefasEdicaoDia"); areaListagem.innerHTML = "";
         const tarefas = bancoCalendarioAtividades[diaSelecionadoChave] || [];
         if (tarefas.length === 0) {
-            areaListagem.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Nenhuma atividade neste dia.</p>`;
-            return;
+            areaListagem.innerHTML = `<p style="font-size:11px; color:var(--text-muted);">Nenhuma atividade neste dia.</p>`; return;
         }
         tarefas.forEach((t, index) => {
             let pct = t.feitas > 0 ? Math.round((t.acertadas / t.feitas) * 100) : 0;
+            let labelCor = t.modo === 'Estudo' ? 'var(--estudo)' : 'var(--danger)';
             areaListagem.innerHTML += `
-                <div class="editor-task-item">
+                <div class="editor-task-item" style="border-left: 4px solid ${labelCor}">
                     <div><strong>[${t.modo}] ${t.mat}</strong><br><small>${t.acertadas}/${t.feitas} acertos (${pct}%)</small></div>
                     <div>
                          <button class="action-table-btn btn-edit-tbl" onclick="carregarParaEdicao('${diaSelecionadoChave}', ${index})">✏️</button>
@@ -605,16 +584,16 @@
 
     function renderTabelaAtividadesDoDia(chaveData) {
         const painelCard = document.getElementById("cardPainelAtividadesFiltrado");
-        const tabelaCorpo = document.getElementById("corpoTabelaAtividadesFiltradas");
-        tabelaCorpo.innerHTML = "";
-        const tarefas = bancoCalendarioAtividades[chaveData] || [];
+        const tabelaCorpo = document.getElementById("corpoTabelaAtividadesFiladas");
+        tabelaCorpo.innerHTML = ""; const tarefas = bancoCalendarioAtividades[chaveData] || [];
         if (tarefas.length > 0) {
             tarefas.forEach((t, idx) => {
                 let pct = t.feitas > 0 ? Math.round((t.acertadas / t.feitas) * 100) : 0;
                 let tr = document.createElement("tr");
+                let txtCorModo = t.modo === 'Estudo' ? 'var(--estudo)' : 'var(--danger)';
                 tr.innerHTML = `
                     <td><b>${t.mat}</b></td>
-                    <td><span style="color:${t.modo === 'Estudo' ? 'var(--estudo)' : 'var(--revisao)'}; font-weight:bold;">${t.modo}</span></td>
+                    <td><span style="color:${txtCorModo}; font-weight:bold;">${t.modo}</span></td>
                     <td>${t.ass}</td>
                     <td>${t.feitas}</td>
                     <td>${t.acertadas}</td>
@@ -627,9 +606,7 @@
                 tabelaCorpo.appendChild(tr);
             });
             painelCard.style.display = "block";
-        } else {
-            painelCard.style.display = "none";
-        }
+        } else { painelCard.style.display = "none"; }
     }
 
     function carregarParaEdicao(chaveData, index) {
@@ -683,24 +660,69 @@
         document.getElementById("displayTempo").innerText = `${hrs}:${mins}:${segs}`;
     }
 
-    function salvarDesempenho() {
-        const mat = document.getElementById("desempenhoMateria").value;
-        const status = document.getElementById("desempenhoStatus").value;
-        rendimentoMaterias[mat] = status; salvarDadosNoNavegador(); renderDesempenho();
-    }
+    // ENGENHARIA DO GRÁFICO DE TEIA (RADAR)
+    function gerarOuAtualizarGraficoTeia() {
+        let consolidados = {};
+        baseCiclo.forEach(m => { consolidados[m.nome] = { feitas: 0, acertos: 0 }; });
 
-    function renderDesempenho() {
-        const container = document.getElementById("quadroDesempenho"); container.innerHTML = "";
-        for (let mat in rendimentoMaterias) {
-            let status = rendimentoMaterias[mat];
-            let label = status === "excelente" ? "85%+" : status === "bom" ? "75%-85%" : status === "regular" ? "60%-75%" : "Alerta";
-            container.innerHTML += `
-                <div class="desempenho-card">
-                    <span style="font-weight:700; font-size:12px;">${mat}</span>
-                    <span class="status-badge st-${status}">${label}</span>
-                </div>
-            `;
+        for (let dataChave in bancoCalendarioAtividades) {
+            bancoCalendarioAtividades[dataChave].forEach(atv => {
+                if (consolidados[atv.mat]) {
+                    consolidados[atv.mat].feitas += parseInt(atv.feitas) || 0;
+                    consolidados[atv.mat].acertos += parseInt(atv.acertadas) || 0;
+                }
+            });
         }
+
+        let rotulosSiglas = [];
+        let dadosAproveitamento = [];
+
+        baseCiclo.forEach(m => {
+            rotulosSiglas.push(tirarSigla(m.nome));
+            let obj = consolidados[m.nome];
+            let pct = obj.feitas > 0 ? Math.round((obj.acertos / obj.feitas) * 100) : 0;
+            dadosAproveitamento.push(pct);
+        });
+
+        const ctx = document.getElementById('graficoTeiaRadar').getContext('2d');
+        
+        if (chartInstancia) {
+            chartInstancia.destroy();
+        }
+
+        chartInstancia = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: rotulosSiglas,
+                datasets: [{
+                    label: 'Aproveitamento Geral (%)',
+                    data: dadosAproveitamento,
+                    backgroundColor: 'rgba(11, 28, 51, 0.2)',
+                    borderColor: 'rgba(11, 28, 51, 1)',
+                    pointBackgroundColor: 'rgba(255, 204, 0, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(11, 28, 51, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { display: true, color: '#CBD5E1' },
+                        suggestedMin: 0,
+                        suggestedMax: 100,
+                        ticks: { stepSize: 20, color: '#64748B' },
+                        pointLabels: { font: { size: 11, weight: 'bold' }, color: '#0B1C33' }
+                    }
+                },
+                plugins: {
+                    legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } }
+                }
+            }
+        });
     }
 
     function renderEdital() {
@@ -709,10 +731,9 @@
             let bDiv = document.createElement("div");
             bDiv.innerHTML = `<div class="bloco-header">${bloco}</div>`;
             for (let materia in dadosEditalCompleto[bloco]) {
-                let mContainer = document.createElement("div");
-                mContainer.className = "materia-container";
+                let mContainer = document.createElement("div"); mContainer.className = "materia-container";
                 mContainer.innerHTML = `
-                    <div class="materia-trigger" onclick="toggleMateriaList(this)"><span>${materia}</span> <span>[+]</span></div>
+                    <div class="materia-trigger" onclick="toggleMateriaList(this)"><span>[${tirarSigla(materia)}] ${materia}</span> <span>[+]</span></div>
                     <div class="topicos-list" style="display:none;">
                         <div class="topico-row" style="font-weight:700; background:#F8FAFC;">
                             <div>Tópico</div><div class="center-check">Teo</div><div class="center-check">Qst</div><div class="center-check">Anki</div>
@@ -743,8 +764,7 @@
     function salvarEstadoCheckboxEdital(el) { editalMarcados[el.id] = el.checked; salvarDadosNoNavegador(); }
     
     function toggleMateriaList(el) {
-        let list = el.nextElementSibling;
-        let ativo = list.style.display === "block";
+        let list = el.nextElementSibling; let ativo = list.style.display === "block";
         list.style.display = ativo ? "none" : "block";
         el.querySelector('span:last-child').innerText = ativo ? "[+]" : "[-]";
     }
